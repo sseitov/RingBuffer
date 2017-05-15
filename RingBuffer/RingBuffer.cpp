@@ -43,16 +43,17 @@ void RingBuffer::write(void (^data)(int16_t*))
     _empty.notify_one();
 }
 
-void RingBuffer::read(void* audioFrame)
+int RingBuffer::read(void* audioFrame)
 {
     std::unique_lock<std::mutex> lock(_mutex);
     _empty.wait(lock, [this]() { return (!isEmpty() || _stopped);});
-    if (_stopped) return;
+    if (_stopped) return 0;
     
     memcpy(audioFrame, _data + _start*_bufferSize, _bufferSize);
     
     _start = (_start + 1) % _count;
     _overflow.notify_one();
+    return _bufferSize;
 }
 
 void RingBuffer::write(void* audioFrame)

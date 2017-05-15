@@ -37,7 +37,7 @@ public:
     void read(void (^data)(int16_t*));
     void write(void (^data)(int16_t*));
 
-    void read(void* audioFrame);
+    int read(void* audioFrame);
     void write(void* audioFrame);
     
     void flush();

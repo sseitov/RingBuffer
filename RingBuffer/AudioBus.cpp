@@ -53,18 +53,13 @@ void AudioBus::write(uint8_t* buffer, int size)
             _audioBuffer.insert(_audioBuffer.end(), decodeBuffer, decodeBuffer + decodeSamples);
         }
         if (_audioBuffer.size() >= FRAME_SIZE) {
-            _ringBuffer.write(&_audioBuffer[0]);
+            ringBuffer.write(&_audioBuffer[0]);
             _audioBuffer.erase(_audioBuffer.begin(), _audioBuffer.begin() + FRAME_SIZE);
         }
     }
 }
 
-void AudioBus::render(AudioBuffer* buffer)
-{
-    _ringBuffer.read(buffer->mData);
-}
-
 void AudioBus::finish()
 {
-    _ringBuffer.stop();
+    ringBuffer.stop();
 }

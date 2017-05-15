@@ -51,7 +51,7 @@ extern "C" {
     [[AVAudioSession sharedInstance] overrideOutputAudioPort:AVAudioSessionPortOverrideNone error:&error];
     [[AVAudioSession sharedInstance] setInputGain:1.0 error:&error]; // ????
     
-    [[AVAudioSession sharedInstance] setPreferredHardwareSampleRate: 24000.0 error: &error];
+    [[AVAudioSession sharedInstance] setPreferredSampleRate: 24000.0 error: &error];
     [[AVAudioSession sharedInstance] setPreferredIOBufferDuration:0.02 error:&error];
     [[AVAudioSession sharedInstance] setActive:YES error:&error];
 }
@@ -143,12 +143,12 @@ extern "C" {
         _senderFinished.wait(reciverLock);
     }
     
-    vcDecryptorDestroy(_decryptor);
-    delete _audioOutput;
-    
     vcEncryptorDestroy(_encryptor);
     opus_encoder_destroy(_opusEncoder);
     delete _audioInput;
+    
+    vcDecryptorDestroy(_decryptor);
+    delete _audioOutput;
 
     [sender setTitle:@"Start" forState:UIControlStateNormal];
 }

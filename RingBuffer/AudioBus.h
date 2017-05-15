@@ -17,7 +17,6 @@
 
 class AudioBus {
     OpusDecoder*            _opusDecoder;
-    RingBuffer              _ringBuffer;
     std::vector<int16_t>    _audioBuffer;
 
     time_t          _lastAccess;
@@ -27,11 +26,12 @@ public:
     AudioBus();
     ~AudioBus();
     
+    RingBuffer  ringBuffer;
+    
     bool isOn() { return _isOn; }
     bool wasDied();
     
     void write(uint8_t* buffer, int size);
-    void render(AudioBuffer* buffer);
     void finish();
 };
 

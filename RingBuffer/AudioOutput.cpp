@@ -20,7 +20,7 @@ OSStatus AudioOutput::renderInput(void *inRefCon,
 {
     AudioOutput* context = (AudioOutput*)inRefCon;
     if (context->_audioBus[inBusNumber].isOn()) {
-        context->_audioBus[inBusNumber].render(ioData->mBuffers);
+        ioData->mBuffers[0].mDataByteSize = context->_audioBus[inBusNumber].ringBuffer.read(ioData->mBuffers[0].mData);
     }
     return noErr;
 }
@@ -106,9 +106,9 @@ AudioOutput::AudioOutput()
     // Initialise & start
     CheckError(AUGraphInitialize(_augraph), "AUGraphInitialize failed");
     start();
-
+    _stopCheck = false;
     _checkThread = new std::thread([](AudioOutput* ref) {
-        while (ref->_augraph != NULL) {
+        while (!ref->_stopCheck) {
             for (int i=0; i< BUS_COUNT; i++) {
                 if (ref->_audioBus[i].wasDied()) {
                     ref->enableInput(i, false);
@@ -122,15 +122,15 @@ AudioOutput::AudioOutput()
 
 AudioOutput::~AudioOutput()
 {
+    _stopCheck = true;
+    _checkThread->join();
+    delete _checkThread;
+    
     for (int i = 0; i < BUS_COUNT; i++) {
-        enableInput(i, false);
         _audioBus[i].finish();
     }
     stop();
     DisposeAUGraph(_augraph);
-    _augraph = NULL;
-    _checkThread->join();
-    delete _checkThread;
 }
 
 void AudioOutput::start()

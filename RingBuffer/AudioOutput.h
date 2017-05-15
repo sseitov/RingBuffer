@@ -22,6 +22,7 @@ class AudioOutput {
     AudioUnit       _output;
     AudioBus        _audioBus[BUS_COUNT];
     std::thread*    _checkThread;
+    bool            _stopCheck;
     
     static OSStatus renderInput(void *inRefCon,
                                 AudioUnitRenderActionFlags *ioActionFlags,
