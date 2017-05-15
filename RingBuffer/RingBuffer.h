@@ -17,7 +17,7 @@
 
 class RingBuffer {
     int						_count;			// maximum number of elements
-    int						_bufferSize;	// size element of data
+    int						_elementSize;	// size element of data
     int						_start;			// index of oldest element
     int						_end;			// index at which to write new element
     bool					_stopped;
