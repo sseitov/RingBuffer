@@ -18,8 +18,6 @@ extern "C" {
     #include <opus/opus.h>
 }
 
-#include <vector>
-
 @interface ViewController () {
     vcEncryptor*    _encryptor;
     AudioInput*     _audioInput;
@@ -27,12 +25,10 @@ extern "C" {
     
     vcDecryptor*    _decryptor;
     AudioOutput*     _audioOutput;
-    
-    std::vector<int16_t> _audioBuffer;
 
-    dispatch_queue_t _senderQueue;
-    std::mutex _senderMutex;
-    bool _senderStopped;
+    dispatch_queue_t        _senderQueue;
+    std::mutex              _senderMutex;
+    bool                    _senderStopped;
     std::condition_variable _senderFinished;
 }
 
@@ -51,7 +47,7 @@ extern "C" {
     [[AVAudioSession sharedInstance] overrideOutputAudioPort:AVAudioSessionPortOverrideNone error:&error];
     [[AVAudioSession sharedInstance] setInputGain:1.0 error:&error]; // ????
     
-    [[AVAudioSession sharedInstance] setPreferredSampleRate: 24000.0 error: &error];
+    [[AVAudioSession sharedInstance] setPreferredSampleRate: 48000.0 error: &error];
     [[AVAudioSession sharedInstance] setPreferredIOBufferDuration:0.02 error:&error];
     [[AVAudioSession sharedInstance] setActive:YES error:&error];
 }
@@ -88,6 +84,9 @@ extern "C" {
     
     _audioOutput = new AudioOutput();
     _decryptor = vcDecryptorCreate(key);
+    static int16_t audioBuffer[OPUS_FRAME_SIZE];
+    static uint8_t  entirePacket[1024];
+    static uint8_t  opusBuffer[1024];
     
     _senderQueue = dispatch_queue_create("NetworkingSender", DISPATCH_QUEUE_SERIAL);
     dispatch_async(_senderQueue, ^{
@@ -95,13 +94,24 @@ extern "C" {
         _senderStopped = false;
         
         while (!_senderStopped) {
-            if (_audioBuffer.size() >= OPUS_FRAME_SIZE) {
-                [self sendBuffer];
-            } else {
-                _audioInput->ringBuffer.read( ^(int16_t* buffer){
-                    _audioBuffer.insert(_audioBuffer.end(), buffer, buffer + FRAME_SIZE);
-                });
+            _audioInput->ringBuffer.read(audioBuffer, OPUS_FRAME_SIZE);
+            int32_t length = opus_encode(_opusEncoder, audioBuffer, OPUS_FRAME_SIZE, opusBuffer, sizeof(opusBuffer));
+            ssize_t encryptedLength = 0;
+            if (length > 2) {
+                unsigned char iv[16];
+                int err = SecRandomCopyBytes(kSecRandomDefault, 16, iv);
+                if (err == 0) {
+                    vcEncryptorEncrypt(_encryptor,
+                                       opusBuffer,
+                                       length,
+                                       iv);
+                    encryptedLength = _encryptor->encryptedLength;
+                    memcpy(entirePacket+1, _encryptor->encrypted, encryptedLength);
+                }
             }
+            
+            vcDecryptorDecrypt(_decryptor, entirePacket+1);
+            _audioOutput->write(entirePacket[0], _decryptor->decrypted, (int)_decryptor->decryptedLength);
         }
         
         std::unique_lock<std::mutex> lock(_senderMutex);
@@ -109,29 +119,6 @@ extern "C" {
         _senderFinished.notify_one();
         printf("Sender thread stopped\n");
     });
-}
-
-- (void)sendBuffer {
-    static uint8_t  entirePacket[1024];
-    static uint8_t  opusBuffer[1024];
-    int32_t length = opus_encode(_opusEncoder, &_audioBuffer[0], OPUS_FRAME_SIZE, opusBuffer, sizeof(opusBuffer));
-    _audioBuffer.erase(_audioBuffer.begin(), _audioBuffer.begin() + OPUS_FRAME_SIZE);
-    ssize_t encryptedLength = 0;
-    if (length > 2) {
-        unsigned char iv[16];
-        int err = SecRandomCopyBytes(kSecRandomDefault, 16, iv);
-        if (err == 0) {
-            vcEncryptorEncrypt(_encryptor,
-                               opusBuffer,
-                               length,
-                               iv);
-            encryptedLength = _encryptor->encryptedLength;
-            memcpy(entirePacket+1, _encryptor->encrypted, encryptedLength);
-        }
-    }
-    
-    vcDecryptorDecrypt(_decryptor, entirePacket+1);
-    _audioOutput->write(entirePacket[0], _decryptor->decrypted, (int)_decryptor->decryptedLength);
 }
 
 - (void)stopRecord:(UIButton*)sender

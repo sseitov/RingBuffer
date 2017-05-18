@@ -20,7 +20,9 @@ OSStatus AudioOutput::renderInput(void *inRefCon,
 {
     AudioOutput* context = (AudioOutput*)inRefCon;
     if (context->_audioBus[inBusNumber].isOn()) {
-        ioData->mBuffers[0].mDataByteSize = context->_audioBus[inBusNumber].ringBuffer.read(ioData->mBuffers[0].mData);
+        int numSamples = ioData->mBuffers[0].mDataByteSize / sizeof(int16_t);
+        int16_t* samples = (int16_t*)ioData->mBuffers[0].mData;
+        context->_audioBus[inBusNumber].ringBuffer.read(samples, numSamples);
     }
     return noErr;
 }

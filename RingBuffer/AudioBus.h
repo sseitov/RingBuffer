@@ -13,12 +13,9 @@
 #include <opus/opus.h>
 #include "AudioUtils.h"
 #include "RingBuffer.h"
-#include <vector>
 
 class AudioBus {
-    OpusDecoder*            _opusDecoder;
-    std::vector<int16_t>    _audioBuffer;
-
+    OpusDecoder*    _opusDecoder;
     time_t          _lastAccess;
     bool            _isOn;
     

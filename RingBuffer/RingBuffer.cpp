@@ -9,9 +9,11 @@
 #include "RingBuffer.h"
 #include "AudioUtils.h"
 
-RingBuffer::RingBuffer() : _count(POOL_SIZE+1), _elementSize(FRAME_SIZE*sizeof(int16_t)), _start(0), _end(0), _stopped(false)
+#define POOL_SIZE   1024*4
+
+RingBuffer::RingBuffer() : _count(POOL_SIZE+1), _start(0), _end(0), _stopped(false)
 {
-    _data = (int16_t*)calloc(_count, _elementSize);
+    _data = (int16_t*)malloc(_count * sizeof(int16_t));
 }
 
 RingBuffer::~RingBuffer()
@@ -19,53 +21,31 @@ RingBuffer::~RingBuffer()
     free(_data);
 }
 
-void RingBuffer::read(void (^data)(int16_t*))
+void RingBuffer::read(int16_t* samples, int count)
 {
     std::unique_lock<std::mutex> lock(_mutex);
     _empty.wait(lock, [this]() { return (!isEmpty() || _stopped);});
     if (_stopped) return;
+
+    for (int i = 0; i<count; i++) {
+        samples[i] = _data[_start];
+        _start = (_start + 1) % _count;
+    }
     
-    data(_data + _start*_elementSize);
-    
-    _start = (_start + 1) % _count;
     _overflow.notify_one();
 }
 
-void RingBuffer::write(void (^data)(int16_t*))
+void RingBuffer::write(int16_t* samples, int count)
 {
     std::unique_lock<std::mutex> lock(_mutex);
     _overflow.wait(lock, [this]() { return (!isFull() || _stopped);});
     if (_stopped) return;
-    
-    data(_data + _end*_elementSize);
-    
-    _end = (_end + 1) % _count;
-    _empty.notify_one();
-}
 
-int RingBuffer::read(void* audioFrame)
-{
-    std::unique_lock<std::mutex> lock(_mutex);
-    _empty.wait(lock, [this]() { return (!isEmpty() || _stopped);});
-    if (_stopped) return 0;
+    for (int i = 0; i<count; i++) {
+        _data[_end] = samples[i];
+        _end = (_end + 1) % _count;
+    }
     
-    memcpy(audioFrame, _data + _start*_elementSize, _elementSize);
-    
-    _start = (_start + 1) % _count;
-    _overflow.notify_one();
-    
-    return _elementSize;
-}
-
-void RingBuffer::write(void* audioFrame)
-{
-    std::unique_lock<std::mutex> lock(_mutex);
-    _overflow.wait(lock, [this]() { return (!isFull() || _stopped);});
-    if (_stopped) return;
-    
-    memcpy(_data + _end*_elementSize, audioFrame, _elementSize);
-    
-    _end = (_end + 1) % _count;
     _empty.notify_one();
 }
 

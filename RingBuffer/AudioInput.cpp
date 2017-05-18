@@ -11,15 +11,22 @@
 
 OSStatus AudioInput::AudioInputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData)
 {
+    static AudioBufferList bufferList;
+    bufferList.mNumberBuffers = 1;
+    bufferList.mBuffers[0].mDataByteSize = inNumberFrames * AUDIO_FORMAT.mBytesPerFrame;
+    bufferList.mBuffers[0].mNumberChannels = AUDIO_FORMAT.mChannelsPerFrame;
+    if (bufferList.mBuffers[0].mData == nil) {
+        bufferList.mBuffers[0].mData = malloc(1024);
+    }
+
     AudioInput* context = (AudioInput*)inRefCon;
-    context->ringBuffer.write(^(int16_t* buffer){
-        AudioBufferList bufferList;
-        bufferList.mNumberBuffers = 1;
-        bufferList.mBuffers[0].mData = buffer;
-        bufferList.mBuffers[0].mDataByteSize = inNumberFrames * AUDIO_FORMAT.mBytesPerFrame;
-        bufferList.mBuffers[0].mNumberChannels = AUDIO_FORMAT.mChannelsPerFrame;
-        CheckError(AudioUnitRender(context->_input, ioActionFlags, inTimeStamp, inBusNumber, inNumberFrames, &bufferList), "AudioUnitRender failed");
-    });
+    CheckError(AudioUnitRender(context->_input, ioActionFlags, inTimeStamp, inBusNumber, inNumberFrames, &bufferList), "AudioUnitRender failed");
+    
+    if (bufferList.mBuffers[0].mDataByteSize > 0) {
+        int16_t* samples = (int16_t*)bufferList.mBuffers[0].mData;
+        int numSamples = bufferList.mBuffers[0].mDataByteSize / sizeof(int16_t);
+        context->ringBuffer.write(samples, numSamples);
+    }
     
     return noErr;
 }

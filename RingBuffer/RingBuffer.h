@@ -12,12 +12,8 @@
 #include <AudioToolbox/AudioToolbox.h>
 #include <mutex>
 
-#define POOL_SIZE   4
-#define FRAME_SIZE  512
-
 class RingBuffer {
     int						_count;			// maximum number of elements
-    int						_elementSize;	// size element of data
     int						_start;			// index of oldest element
     int						_end;			// index at which to write new element
     bool					_stopped;
@@ -34,11 +30,8 @@ public:
     bool isFull() { return (_end + 1) % _count == _start; }
     bool isEmpty() { return _end == _start; }
     
-    void read(void (^data)(int16_t*));
-    void write(void (^data)(int16_t*));
-
-    int read(void* audioFrame);
-    void write(void* audioFrame);
+    void read(int16_t* samples, int count);
+    void write(int16_t* samples, int count);
     
     void flush();
     void stop();

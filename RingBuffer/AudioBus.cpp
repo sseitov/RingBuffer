@@ -50,11 +50,7 @@ void AudioBus::write(uint8_t* buffer, int size)
             decodeSamples = opus_decode(_opusDecoder, NULL, 0, decodeBuffer, OPUS_FRAME_SIZE, 0);
         }
         if (decodeSamples > 0) {
-            _audioBuffer.insert(_audioBuffer.end(), decodeBuffer, decodeBuffer + decodeSamples);
-        }
-        if (_audioBuffer.size() >= FRAME_SIZE) {
-            ringBuffer.write(&_audioBuffer[0]);
-            _audioBuffer.erase(_audioBuffer.begin(), _audioBuffer.begin() + FRAME_SIZE);
+            ringBuffer.write(decodeBuffer, decodeSamples);
         }
     }
 }
