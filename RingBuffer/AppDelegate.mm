@@ -7,6 +7,7 @@
 //
 
 #import "AppDelegate.h"
+#include "RingBuffer.h"
 
 @interface AppDelegate ()
 
@@ -16,7 +17,28 @@
 
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
-    // Override point for customization after application launch.
+/*
+    RingBuffer buffer;
+    Element frame[4];
+    buffer.write(frame, 3); // +3
+    buffer.log();
+    buffer.write(frame, 3);
+    
+    buffer.read(frame, 2);  // -2 = 1
+    buffer.log();
+    
+    buffer.write(frame, 3); // +3 = 4
+    buffer.log();
+    
+    buffer.write(frame, 3);
+    buffer.write(frame, 1); // +1 = 5
+    buffer.log();
+    
+    buffer.read(frame, 3);
+    buffer.read(frame, 3); // -3 = 2
+    buffer.log();
+    buffer.write(frame, 3); // +3 = 5
+*/    
     return YES;
 }
 

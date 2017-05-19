@@ -11,42 +11,71 @@
 
 #define POOL_SIZE   1024*4
 
-RingBuffer::RingBuffer() : _count(POOL_SIZE+1), _start(0), _end(0), _stopped(false)
+RingBuffer::RingBuffer() : _capacity(POOL_SIZE), _start(0), _end(0), _stopped(false)
 {
-    _data = (int16_t*)malloc(_count * sizeof(int16_t));
+    _data = new Element[_capacity];
 }
 
 RingBuffer::~RingBuffer()
 {
-    free(_data);
+    delete [] _data;
 }
 
-void RingBuffer::read(int16_t* samples, int count)
+int RingBuffer::available()
+{
+    if (_start < _end) {
+        return _end - _start;
+    } else if (_start > _end) {
+        return  _capacity - (_start - _end);
+    } else {
+        return 0;
+    }
+}
+
+int RingBuffer::space()
+{
+    if (_end < _start) {
+        return _start - _end - 1;
+    } else if (_end > _start) {
+        return _capacity - _end + _start - 1;
+    } else {
+        return _capacity - 1;
+    }
+}
+
+void RingBuffer::log()
+{
+    printf("start %d, end %d, available %d, free space %d\n", _start, _end, available(), space());
+}
+
+void RingBuffer::read(Element* samples, int count)
 {
     std::unique_lock<std::mutex> lock(_mutex);
-    _empty.wait(lock, [this]() { return (!isEmpty() || _stopped);});
+    _checkAvailable = count;
+    _available.wait(lock, [this]() { return (isAvailable() || _stopped);});
     if (_stopped) return;
-
+    
     for (int i = 0; i<count; i++) {
         samples[i] = _data[_start];
-        _start = (_start + 1) % _count;
+        _start = (_start + 1) % _capacity;
     }
     
-    _overflow.notify_one();
+    _space.notify_one();
 }
 
-void RingBuffer::write(int16_t* samples, int count)
+void RingBuffer::write(Element* samples, int count)
 {
     std::unique_lock<std::mutex> lock(_mutex);
-    _overflow.wait(lock, [this]() { return (!isFull() || _stopped);});
+    _checkSpace = count;
+    _space.wait(lock, [this]() { return (isSpace() || _stopped);});
     if (_stopped) return;
-
+    
     for (int i = 0; i<count; i++) {
         _data[_end] = samples[i];
-        _end = (_end + 1) % _count;
+        _end = (_end + 1) % _capacity;
     }
     
-    _empty.notify_one();
+    _available.notify_one();
 }
 
 void RingBuffer::flush()
@@ -59,6 +88,6 @@ void RingBuffer::stop()
 {
     std::unique_lock<std::mutex> lock(_mutex);
     _stopped = true;
-    _overflow.notify_one();
-    _empty.notify_one();
+    _space.notify_one();
+    _available.notify_one();
 }

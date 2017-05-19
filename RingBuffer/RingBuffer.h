@@ -12,29 +12,38 @@
 #include <AudioToolbox/AudioToolbox.h>
 #include <mutex>
 
+typedef int16_t Element;
+
 class RingBuffer {
-    int						_count;			// maximum number of elements
+    int						_capacity;      // maximum number of elements
     int						_start;			// index of oldest element
     int						_end;			// index at which to write new element
     bool					_stopped;
-    int16_t*				_data;			// raw data
+    Element*				_data;			// raw data
+    
     std::mutex				_mutex;
-    std::condition_variable _overflow;
-    std::condition_variable _empty;
-   
+    std::condition_variable _available;
+    std::condition_variable _space;
+
+    int     _checkAvailable;
+    int     _checkSpace;
+    int     available();
+    int     space();
+    
+    bool    isAvailable() { return available() >= _checkAvailable; }
+    bool    isSpace() { return space() >= _checkSpace; }
+
 public:
     
     RingBuffer();
     ~RingBuffer();
     
-    bool isFull() { return (_end + 1) % _count == _start; }
-    bool isEmpty() { return _end == _start; }
-    
-    void read(int16_t* samples, int count);
-    void write(int16_t* samples, int count);
-    
-    void flush();
-    void stop();
+    void    read(Element* samples, int count);
+    void    write(Element* samples, int count);
+    void    log();
+
+    void    flush();
+    void    stop();
 };
 
 #endif /* OutputRingBuffer_h */
