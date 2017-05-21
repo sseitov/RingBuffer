@@ -14,22 +14,24 @@
 #include "AudioUtils.h"
 #include "RingBuffer.h"
 
+class AudioOutput;
+
 class AudioBus {
+    friend class AudioOutput;
+    
+    RingBuffer      _ringBuffer;
     OpusDecoder*    _opusDecoder;
     time_t          _lastAccess;
-    bool            _isOn;
+    int16_t         _decodeBuffer[OPUS_FRAME_SIZE];
+    int             _decodeSamples;
     
 public:
-    AudioBus();
+    AudioBus(int num);
     ~AudioBus();
     
-    RingBuffer  ringBuffer;
-    
-    bool isOn() { return _isOn; }
+    int number;
     bool wasDied();
-    
     void write(uint8_t* buffer, int size);
-    void finish();
 };
 
 #endif /* AudioBus_h */

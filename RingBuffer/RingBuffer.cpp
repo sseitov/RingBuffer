@@ -18,6 +18,7 @@ RingBuffer::RingBuffer() : _capacity(POOL_SIZE), _start(0), _end(0), _stopped(fa
 
 RingBuffer::~RingBuffer()
 {
+    stop();
     delete [] _data;
 }
 

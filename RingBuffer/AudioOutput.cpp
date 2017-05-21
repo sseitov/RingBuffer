@@ -9,6 +9,8 @@
 #include "AudioOutput.h"
 #include "AudioUtils.h"
 
+#define BUS_COUNT    8
+
 #pragma mark - AudioOutput private
 
 OSStatus AudioOutput::renderInput(void *inRefCon,
@@ -19,10 +21,17 @@ OSStatus AudioOutput::renderInput(void *inRefCon,
                                AudioBufferList *ioData)
 {
     AudioOutput* context = (AudioOutput*)inRefCon;
-    if (context->_audioBus[inBusNumber].isOn()) {
-        int numSamples = ioData->mBuffers[0].mDataByteSize / sizeof(int16_t);
-        int16_t* samples = (int16_t*)ioData->mBuffers[0].mData;
-        context->_audioBus[inBusNumber].ringBuffer.read(samples, numSamples);
+    Bus bus = context->_audioBus.find(inBusNumber);
+    if (bus != context->_audioBus.end()) {
+        if (bus->second->wasDied()) {
+            context->enableInput(bus->second->number, false);
+            delete bus->second;
+            context->_audioBus.erase(bus);
+        } else {
+            int numSamples = ioData->mBuffers[0].mDataByteSize / sizeof(int16_t);
+            int16_t* samples = (int16_t*)ioData->mBuffers[0].mData;
+            bus->second->_ringBuffer.read(samples, numSamples);
+        }
     }
     return noErr;
 }
@@ -108,31 +117,20 @@ AudioOutput::AudioOutput()
     // Initialise & start
     CheckError(AUGraphInitialize(_augraph), "AUGraphInitialize failed");
     start();
-    _stopCheck = false;
-    _checkThread = new std::thread([](AudioOutput* ref) {
-        while (!ref->_stopCheck) {
-            for (int i=0; i< BUS_COUNT; i++) {
-                if (ref->_audioBus[i].wasDied()) {
-                    ref->enableInput(i, false);
-                }
-            }
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        }
-    }, this);
- 
 }
 
 AudioOutput::~AudioOutput()
 {
-    _stopCheck = true;
-    _checkThread->join();
-    delete _checkThread;
-    
-    for (int i = 0; i < BUS_COUNT; i++) {
-        _audioBus[i].finish();
-    }
     stop();
-    DisposeAUGraph(_augraph);
+    CheckError(AUGraphUninitialize(_augraph), "AUGraphUninitialize failed");
+    CheckError(DisposeAUGraph(_augraph), "DisposeAUGraph failed");
+    
+    Bus bus = _audioBus.begin();
+    while (bus != _audioBus.end()) {
+        delete bus->second;
+        bus = _audioBus.erase(bus);
+    }
+    
 }
 
 void AudioOutput::start()
@@ -145,13 +143,14 @@ void AudioOutput::stop()
     CheckError(AUGraphStop(_augraph), "AUGraphStop failed");
 }
 
-void AudioOutput::write(uint8_t bufferID, uint8_t *buffer, int size)
+void AudioOutput::write(int bufferID, uint8_t *buffer, int size)
 {
     if (bufferID < BUS_COUNT) {
-        if (!_audioBus[bufferID].isOn()) {
+        if (_audioBus.find(bufferID) == _audioBus.end()) {
+            _audioBus[bufferID] = new AudioBus(bufferID);
             enableInput(bufferID, true);
         }
-        _audioBus[bufferID].write(buffer, size);
+        _audioBus[bufferID]->write(buffer, size);
     }
 }
 

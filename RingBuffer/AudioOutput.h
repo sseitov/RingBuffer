@@ -12,17 +12,17 @@
 #include "AudioBus.h"
 #include <AudioToolbox/AudioToolbox.h>
 #include <thread>
+#include <map>
+#include <mutex>
 
-#define BUS_COUNT    8
+typedef std::map<int, AudioBus*>::iterator Bus;
 
 class AudioOutput {
     
-    AUGraph         _augraph;
-    AudioUnit       _mixer;
-    AudioUnit       _output;
-    AudioBus        _audioBus[BUS_COUNT];
-    std::thread*    _checkThread;
-    bool            _stopCheck;
+    AUGraph                     _augraph;
+    AudioUnit                   _mixer;
+    AudioUnit                   _output;
+    std::map<int, AudioBus*>   _audioBus;
     
     static OSStatus renderInput(void *inRefCon,
                                 AudioUnitRenderActionFlags *ioActionFlags,
@@ -38,7 +38,7 @@ public:
     
     void start();
     void stop();
-    void write(uint8_t bufferID, uint8_t *buffer, int size);
+    void write(int bufferID, uint8_t *buffer, int size);
     void mute(bool isMute);
 };
 
